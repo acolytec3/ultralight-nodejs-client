@@ -1,0 +1,6 @@
+node_modules
+lib
+local-enr
+peer-id.json
+bootstrap-enrs
+output-enrs
