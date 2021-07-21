@@ -4,19 +4,23 @@ A prototype for an Ethereum Portal Client, written in Typescript.  Completely in
 
 ## Usage
 
-`ultralight --help` - Help text
-
-`ultralight init` - Initializes new PeerId and ENR in local directory
+### Getting Started
 
 `ultralight [run]` - Runs Ultralight
+### CLI Options
 
-`ultralight -f [https://my_infura_access_point]` - Runs Ultralight with an HTTP Web3 Provider for sourcing balance/block data; defaults to Cloudflare 
+`--help` - Help text
 
+`init` - Initializes new PeerId and ENR in local directory
+
+`-f [https://my_HTTP_web3_provider_access_point]` - Runs Ultralight with an HTTP Web3 Provider for sourcing balance/block data; defaults to Cloudflare 
+
+`--rpc-port 1234` - Runs Ultralight with the JSON-RPC port set to `1234`; defaults to 3000
 
 
 ## JSON-RPC Calls
 
-Ultralight exposes a JSON-RPC interface at `localhost:3000` with tbe below API calls available:
+Ultralight exposes a JSON-RPC interface at `localhost:[rpc-port]` with tbe below API calls available:
 
 `eth_getBlockByHash` - follows standard Ethereum JSON-RPC call; proxies to Cloudflare Ethereum gateway (or the HTTP web3 provider provided in arguments)
 
