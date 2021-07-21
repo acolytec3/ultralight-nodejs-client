@@ -12,7 +12,7 @@ A prototype for an Ethereum Portal Client, written in Typescript.  Completely in
 
 `ultralight -f [https://my_infura_access_point]` - Runs Ultralight with an HTTP Web3 Provider for sourcing balance/block data; defaults to Cloudflare 
 
-Note: A UDP Multiaddr, PeerId, Local ENR, and Output ENRs files must be provided to run Ultralight.
+
 
 ## JSON-RPC Calls
 
@@ -26,7 +26,9 @@ Ultralight exposes a JSON-RPC interface at `localhost:3000` with tbe below API c
 
 `epn_nodeId` - returns the node ID of the Ultralight node
 
-`epn_addEnr` - Add ENR for a bootstrap node to Ultralight's address book
+`admin_addEnr` - Add ENR for a bootstrap node to Ultralight's address book
+
+`epn_findContent` - submits a request for content to the portal network; takes a single string as a parameter
 ## Logging
 
 Additional logs may be configured with the `DEBUG` environment variable.
