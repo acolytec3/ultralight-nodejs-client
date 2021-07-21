@@ -13,6 +13,7 @@ import {
 } from "./util";
 import jayson from "jayson/promise";
 import axios from "axios";
+import { Multiaddr } from "multiaddr";
 exports.command = ["$0", "run"];
 
 exports.describe = "Run Ultralight - a Typescripted Ethereum Portal Client";
@@ -53,10 +54,15 @@ exports.builder = {
   },
   "f": {
     alias: "full-node-endpoint",
-    demandOption: true,
     default: "https://cloudflare-eth.com",
     describe: "HTTP endpoint for full node for validating network data (e.g. Infura/Cloudflare/Alchemy)",
     type: "string"
+  },
+  "rpc-port": {
+    alias: "rpc-port",
+    default: 3000,
+    describe: "Port exposed by RPC server",
+    type: "number"
   }
 };
 
@@ -67,13 +73,14 @@ interface IInput {
   a: string;
   o: string;
   f: string;
+  "rpc-port": number;
 }
 
 exports.handler = function (argv: IInput): void {
   process.on("SIGTERM", () => stop(argv.p, argv.e, argv.o));
   process.on("SIGINT", () => stop(argv.p, argv.e, argv.o));
   process.on("SIGHUP", () => save(argv.p, argv.e, argv.o));
-  init(argv.p, argv.e, argv.b, argv.a).then(() => start(argv.f));
+  init(argv.p, argv.e, argv.b, argv.a).then(() => start(argv.f, argv["rpc-port"]));
 };
 
 const log = debug("discv5:cli");
@@ -95,14 +102,14 @@ async function init(
   const bootstrapEnrs = readEnrs(bootstrapEnrsFile);
   const bindAddress = getBindAddress(bindAddressString);
 
-  discv5 = Discv5.create({ enr: localEnr, peerId, multiaddr: bindAddress });
+  discv5 = Discv5.create({ enr: localEnr, peerId, multiaddr: new Multiaddr(bindAddress) });
   bootstrapEnrs.forEach((enr) => {
-    log("Adding bootstrap enr: %s", enr.encodeTxt());
+    log(`Adding bootstrap enr: ${enr.encodeTxt()}`);
     discv5.addEnr(enr);
   });
 }
 
-async function start(endpoint: string): Promise<void> {
+async function start(endpoint: string, rpcport: number): Promise<void> {
   server = new jayson.Server({
     epn_enr: async function () {
       const enr = discv5.enr.encodeTxt(discv5.keypair.privateKey);
@@ -111,9 +118,19 @@ async function start(endpoint: string): Promise<void> {
     epn_nodeId: async function () {
       return discv5.enr.nodeId;
     },
+    epn_isStarted: async function () {
+      return discv5.isStarted();
+    },
     admin_addEnr: async function (args: string[]) {
-      discv5.addEnr(args[0]);
+      try {
+        discv5.addEnr(args[0]);
+      }
+      catch (err) { log(`Error adding ENR: ${err}`); }
       return null;
+    },
+    epn_findContent: async function (args: string[]) {
+      const content = args[0];
+      await discv5.findContent(content);
     },
     eth_getBalance: async function (args: string[]) {
       const account = args[0];
@@ -154,7 +171,6 @@ async function start(endpoint: string): Promise<void> {
       catch (err) { console.log(err); }
     },
     eth_getTransactionByHash: async function (args: string[]) {
-      console.log("they want em blockhash!", args[0]);
       const transactionHash = args[0];
       try {
         const res = await axios.post(endpoint,
@@ -172,12 +188,18 @@ async function start(endpoint: string): Promise<void> {
         return res.data;
       }
       catch (err) { console.log(err); }
-    }
+    },
   });
-  
-  await server.http().listen(3000, function () { log("rpc server listening on port 3000"); });
-  await discv5.start();
-  log("Service started on %s with local node id: %s", discv5.bindAddress, discv5.enr.nodeId);
+  server.on("request", (msg) => { 
+    log(`RPC Message Received: Method - ${msg.method} - params: ${msg.params}`);
+  });
+  await server.http().listen(rpcport, function () { log(`rpc server listening on port ${rpcport}`); });
+  try {
+    await discv5.start();
+  }
+  catch (err) { log(`Error starting Discv5: ${err.message}`);}
+
+  log(`Service started on ${discv5.bindAddress} with local node id: ${discv5.enr.nodeId}`);
 
   while (discv5.isStarted()) {
     const nodeId = toHex(randomBytes(32));
@@ -185,8 +207,8 @@ async function start(endpoint: string): Promise<void> {
     const nearest = await discv5.findNode(nodeId);
     if (discv5.isStarted()) {
       nearest.forEach((enr) => foundEnrs[enr.nodeId] = enr);
-      log("%d total enrs in the table", discv5.kadValues().length);
-      log("%d total connected peers", discv5.connectedPeerCount);
+      log(`${discv5.kadValues().length} total enrs in the table`);
+      log(`${discv5.connectedPeerCount} total connected peers`);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }

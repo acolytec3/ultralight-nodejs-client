@@ -10,7 +10,7 @@ A prototype for an Ethereum Portal Client, written in Typescript.  Completely in
 
 `ultralight [run]` - Runs Ultralight
 
-`ultralight -f [https://my_infura_access_point]` - Runs Ultralight with an HTTP Web3 Provider; defaults to Cloudflare 
+`ultralight -f [https://my_infura_access_point]` - Runs Ultralight with an HTTP Web3 Provider for sourcing balance/block data; defaults to Cloudflare 
 
 Note: A UDP Multiaddr, PeerId, Local ENR, and Output ENRs files must be provided to run Ultralight.
 

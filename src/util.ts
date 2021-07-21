@@ -1,8 +1,7 @@
 import fs = require("fs");
-import Multiaddr = require("multiaddr");
 import PeerId = require("peer-id");
 import { ENR } from "@chainsafe/discv5";
-
+import { Multiaddr } from "multiaddr"
 export async function createPeerId(): Promise<PeerId> {
   return PeerId.create({ keyType: "secp256k1" });
 }
@@ -46,7 +45,7 @@ export function writeEnrs(filename: string, enrs: ENR[]): void {
 }
 
 export function getBindAddress(addr: string): Multiaddr {
-  const mu = Multiaddr(addr);
+  const mu = new Multiaddr(addr);
   const protoNames = mu.protoNames();
   if (protoNames.length !== 2 || protoNames[1] !== "udp") {
     throw new Error("Invalid bind address, must be a udp multiaddr");
