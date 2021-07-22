@@ -1,7 +1,7 @@
 import fs = require("fs");
 import PeerId = require("peer-id");
 import { ENR } from "@chainsafe/discv5";
-import { Multiaddr } from "multiaddr"
+import { Multiaddr } from "multiaddr";
 export async function createPeerId(): Promise<PeerId> {
   return PeerId.create({ keyType: "secp256k1" });
 }

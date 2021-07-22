@@ -102,7 +102,7 @@ async function init(
   const bootstrapEnrs = readEnrs(bootstrapEnrsFile);
   const bindAddress = getBindAddress(bindAddressString);
 
-  discv5 = Discv5.create({ enr: localEnr, peerId, multiaddr: new Multiaddr(bindAddress) });
+  discv5 = Discv5.create({ enr: localEnr, peerId, multiaddr: new Multiaddr(bindAddress), config: { requestRetries: 3 }});
   bootstrapEnrs.forEach((enr) => {
     log(`Adding bootstrap enr: ${enr.encodeTxt()}`);
     discv5.addEnr(enr);
@@ -200,6 +200,9 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
   catch (err) { log(`Error starting Discv5: ${err.message}`);}
 
   log(`Service started on ${discv5.bindAddress} with local node id: ${discv5.enr.nodeId}`);
+
+  discv5.on("discovered", (enr) => log(`Discovered node with id: ${enr.id}`));
+  discv5.on("enrAdded", (enr) => log(`Added ENR: ${enr.encodeTxt()}`));
 
   while (discv5.isStarted()) {
     const nodeId = toHex(randomBytes(32));
