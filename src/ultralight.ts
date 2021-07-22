@@ -1,15 +1,15 @@
 import process = require("process");
 import debug = require("debug");
 import randomBytes = require("randombytes");
-import {
-  ENR,
-  Discv5,
-  toHex,
-} from "@chainsafe/discv5";
+import { ENR, Discv5, toHex } from "@chainsafe/discv5";
 import {
   getBindAddress,
-  readPeerId, readEnr, readEnrs,
-  writePeerId, writeEnr, writeEnrs,
+  readPeerId,
+  readEnr,
+  readEnrs,
+  writePeerId,
+  writeEnr,
+  writeEnrs,
 } from "./util";
 import jayson from "jayson/promise";
 import axios from "axios";
@@ -19,51 +19,52 @@ exports.command = ["$0", "run"];
 exports.describe = "Run Ultralight - a Typescripted Ethereum Portal Client";
 
 exports.builder = {
-  "p": {
+  p: {
     alias: "peer-id-file",
     demandOption: true,
     default: "./peer-id.json",
     describe: "PeerId file",
     type: "string",
   },
-  "e": {
+  e: {
     alias: "local-enr-file",
     default: "./local-enr",
     describe: "Local ENR file",
     type: "string",
   },
-  "b": {
+  b: {
     alias: "bootstrap-enrs-file",
     demandOption: true,
     default: "./bootstrap-enrs",
     describe: "Bootstrap ENRs file, line delimited",
-    type: "string"
+    type: "string",
   },
-  "a": {
+  a: {
     alias: "bind-address",
     default: "/ip4/0.0.0.0/udp/5500",
     describe: "Multiaddr of the bind address (Must use UDP transport)",
-    type: "string"
+    type: "string",
   },
-  "o": {
+  o: {
     alias: "output-enrs-file",
     demandOption: true,
     default: "./output-enrs",
     describe: "Output ENRs file, line delimited",
     type: "string",
   },
-  "f": {
+  f: {
     alias: "full-node-endpoint",
     default: "https://cloudflare-eth.com",
-    describe: "HTTP endpoint for full node for validating network data (e.g. Infura/Cloudflare/Alchemy)",
-    type: "string"
+    describe:
+      "HTTP endpoint for full node for validating network data (e.g. Infura/Cloudflare/Alchemy)",
+    type: "string",
   },
   "rpc-port": {
     alias: "rpc-port",
     default: 3000,
     describe: "Port exposed by RPC server",
-    type: "number"
-  }
+    type: "number",
+  },
 };
 
 interface IInput {
@@ -80,7 +81,9 @@ exports.handler = function (argv: IInput): void {
   process.on("SIGTERM", () => stop(argv.p, argv.e, argv.o));
   process.on("SIGINT", () => stop(argv.p, argv.e, argv.o));
   process.on("SIGHUP", () => save(argv.p, argv.e, argv.o));
-  init(argv.p, argv.e, argv.b, argv.a).then(() => start(argv.f, argv["rpc-port"]));
+  init(argv.p, argv.e, argv.b, argv.a).then(() =>
+    start(argv.f, argv["rpc-port"])
+  );
 };
 
 const log = debug("discv5:cli");
@@ -94,15 +97,19 @@ async function init(
   peerIdFile: string,
   enrFile: string,
   bootstrapEnrsFile: string,
-  bindAddressString: string,
-
+  bindAddressString: string
 ): Promise<void> {
   const peerId = await readPeerId(peerIdFile);
   const localEnr = readEnr(enrFile);
   const bootstrapEnrs = readEnrs(bootstrapEnrsFile);
   const bindAddress = getBindAddress(bindAddressString);
 
-  discv5 = Discv5.create({ enr: localEnr, peerId, multiaddr: new Multiaddr(bindAddress), config: { requestRetries: 3 }});
+  discv5 = Discv5.create({
+    enr: localEnr,
+    peerId,
+    multiaddr: new Multiaddr(bindAddress),
+    config: { requestRetries: 3 },
+  });
   bootstrapEnrs.forEach((enr) => {
     log(`Adding bootstrap enr: ${enr.encodeTxt()}`);
     discv5.addEnr(enr);
@@ -124,95 +131,102 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
     admin_addEnr: async function (args: string[]) {
       try {
         discv5.addEnr(args[0]);
+      } catch (err) {
+        log(`Error adding ENR: ${err}`);
       }
-      catch (err) { log(`Error adding ENR: ${err}`); }
       return null;
     },
     epn_findContent: async function (args: string[]) {
       const content = args[0];
-      await discv5.findContent(content);
+      const msg = Buffer.from(content);
+      await discv5.sendTalkReq(msg, "portal");
     },
     eth_getBalance: async function (args: string[]) {
       const account = args[0];
       try {
-        const res = await axios.post(endpoint,
-          {
-            headers: {
-              "Content-Type": "application/json"
-            },
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_getBalance",
-            params: [
-              account, "latest"
-            ],
-          });
+        const res = await axios.post(endpoint, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_getBalance",
+          params: [account, "latest"],
+        });
         return res.data;
+      } catch (err) {
+        console.log(err);
       }
-      catch (err) { console.log(err); }
     },
     eth_getBlockByHash: async function (args: string[]) {
       const blockHash = args[0];
       try {
-        const res = await axios.post(endpoint,
-          {
-            headers: {
-              "Content-Type": "application/json"
-            },
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_getBlockByHash",
-            params: [
-              blockHash, false
-            ],
-          });
+        const res = await axios.post(endpoint, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_getBlockByHash",
+          params: [blockHash, false],
+        });
         return res.data;
+      } catch (err) {
+        console.log(err);
       }
-      catch (err) { console.log(err); }
     },
     eth_getTransactionByHash: async function (args: string[]) {
       const transactionHash = args[0];
       try {
-        const res = await axios.post(endpoint,
-          {
-            headers: {
-              "Content-Type": "application/json"
-            },
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_getBlockByHash",
-            params: [
-              transactionHash, false
-            ],
-          });
+        const res = await axios.post(endpoint, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_getBlockByHash",
+          params: [transactionHash, false],
+        });
         return res.data;
+      } catch (err) {
+        console.log(err);
       }
-      catch (err) { console.log(err); }
     },
   });
-  server.on("request", (msg) => { 
+  server.on("request", (msg) => {
     log(`RPC Message Received: Method - ${msg.method} - params: ${msg.params}`);
   });
-  await server.http().listen(rpcport, function () { log(`rpc server listening on port ${rpcport}`); });
+  await server.http().listen(rpcport, function () {
+    log(`rpc server listening on port ${rpcport}`);
+  });
   try {
     await discv5.start();
+  } catch (err) {
+    log(`Error starting Discv5: ${err.message}`);
   }
-  catch (err) { log(`Error starting Discv5: ${err.message}`);}
 
-  log(`Service started on ${discv5.bindAddress} with local node id: ${discv5.enr.nodeId}`);
+  log(
+    `Service started on ${discv5.bindAddress} with local node id: ${discv5.enr.nodeId}`
+  );
 
   discv5.on("discovered", (enr) => log(`Discovered node with id: ${enr.id}`));
   discv5.on("enrAdded", (enr) => log(`Added ENR: ${enr.encodeTxt()}`));
-
+  discv5.on("talkReqReceived", (srcId, msg) => {
+    log(`Received message from ${srcId}`);
+    const response = msg.request.toString("utf-8") + "back at you";
+    discv5.sendTalkResp(srcId, msg, Buffer.from(response));
+  });
+  discv5.on("talkRespReceived", (srcId, msg) => log(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
+  
   while (discv5.isStarted()) {
     const nodeId = toHex(randomBytes(32));
     log("Find node: %s", nodeId);
     const nearest = await discv5.findNode(nodeId);
     if (discv5.isStarted()) {
-      nearest.forEach((enr) => foundEnrs[enr.nodeId] = enr);
+      nearest.forEach((enr) => (foundEnrs[enr.nodeId] = enr));
       log(`${discv5.kadValues().length} total enrs in the table`);
       log(`${discv5.connectedPeerCount} total connected peers`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 }
@@ -220,7 +234,7 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
 async function save(
   peerIdFile: string,
   enrFile: string,
-  outputFile: string,
+  outputFile: string
 ): Promise<void> {
   const peerId = await discv5.peerId();
   writePeerId(peerIdFile, peerId);
@@ -231,11 +245,10 @@ async function save(
 async function stop(
   peerIdFile: string,
   enrFile: string,
-  outputFile: string,
+  outputFile: string
 ): Promise<void> {
   await save(peerIdFile, enrFile, outputFile);
   await discv5.stop();
   log("Service stopped");
   process.exit(0);
 }
-
