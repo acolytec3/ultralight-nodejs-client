@@ -56,7 +56,7 @@
     "typescript": "^3.7.2"
   },
   "dependencies": {
-    "@chainsafe/discv5": "file:../discv5",
+    "@chainsafe/discv5": "^0.6.1",
     "axios": "^0.21.1",
     "debug": "^4.1.1",
     "ethers": "^5.4.1",

@@ -139,7 +139,7 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
     epn_findContent: async function (args: string[]) {
       const content = args[0];
       const msg = Buffer.from(content);
-      await discv5.sendTalkReq(msg, "portal");
+      await discv5.broadcastTalkReq(msg, "portal");
     },
     eth_getBalance: async function (args: string[]) {
       const account = args[0];
@@ -211,13 +211,13 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
 
   discv5.on("discovered", (enr) => log(`Discovered node with id: ${enr.id}`));
   discv5.on("enrAdded", (enr) => log(`Added ENR: ${enr.encodeTxt()}`));
-  discv5.on("talkReqReceived", (srcId, msg) => {
+  discv5.on("talkReqReceived", (srcId, enr, msg) => {
     log(`Received message from ${srcId}`);
     const response = msg.request.toString("utf-8") + "back at you";
-    discv5.sendTalkResp(srcId, msg, Buffer.from(response));
+    discv5.sendTalkResp(srcId, msg.id, Buffer.from(response));
   });
-  discv5.on("talkRespReceived", (srcId, msg) => log(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
-  
+  discv5.on("talkRespReceived", (srcId, enr, msg) => log(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
+ /* 
   while (discv5.isStarted()) {
     const nodeId = toHex(randomBytes(32));
     log("Find node: %s", nodeId);
@@ -228,7 +228,7 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
       log(`${discv5.connectedPeerCount} total connected peers`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-  }
+  }*/
 }
 
 async function save(
