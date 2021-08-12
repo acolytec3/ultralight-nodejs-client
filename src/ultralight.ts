@@ -41,7 +41,7 @@ exports.builder = {
   },
   a: {
     alias: "bind-address",
-    default: "/ip4/0.0.0.0/udp/5500",
+    default: "/ip4/0.0.0.0/tcp/5500/wss",
     describe: "Multiaddr of the bind address (Must use UDP transport)",
     type: "string",
   },
