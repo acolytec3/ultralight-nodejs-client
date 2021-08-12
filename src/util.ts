@@ -47,8 +47,8 @@ export function writeEnrs(filename: string, enrs: ENR[]): void {
 export function getBindAddress(addr: string): Multiaddr {
   const mu = new Multiaddr(addr);
   const protoNames = mu.protoNames();
-  if (protoNames.length !== 2 || protoNames[1] !== "udp") {
-    throw new Error("Invalid bind address, must be a udp multiaddr");
+  if ((protoNames.length === 2 && protoNames[1] !== "udp") || (protoNames.length === 3 && protoNames[2] !== "wss")) {
+    throw new Error("Invalid bind address, must be a udp or wss multiaddr");
   }
   return mu;
 }

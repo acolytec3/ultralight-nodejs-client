@@ -1,7 +1,6 @@
 import process = require("process");
 import debug = require("debug");
-import randomBytes = require("randombytes");
-import { ENR, Discv5, toHex } from "@chainsafe/discv5";
+import { ENR, Discv5 } from "@chainsafe/discv5";
 import {
   getBindAddress,
   readPeerId,
@@ -10,10 +9,13 @@ import {
   writePeerId,
   writeEnr,
   writeEnrs,
+  createPeerId,
+  createEnr,
 } from "./util";
 import jayson from "jayson/promise";
 import axios from "axios";
 import { Multiaddr } from "multiaddr";
+
 exports.command = ["$0", "run"];
 
 exports.describe = "Run Ultralight - a Typescripted Ethereum Portal Client";
@@ -21,21 +23,19 @@ exports.describe = "Run Ultralight - a Typescripted Ethereum Portal Client";
 exports.builder = {
   p: {
     alias: "peer-id-file",
-    demandOption: true,
-    default: "./peer-id.json",
-    describe: "PeerId file",
+    demandOption: false,
+    describe: "PeerId file -- e.g. ./peer-id.json",
     type: "string",
   },
   e: {
     alias: "local-enr-file",
-    default: "./local-enr",
-    describe: "Local ENR file",
+    demandOption:false,
+    describe: "Local ENR file -- e.g. ./local-enrs",
     type: "string",
   },
   b: {
     alias: "bootstrap-enrs-file",
-    demandOption: true,
-    default: "./bootstrap-enrs",
+    demandOption: false,
     describe: "Bootstrap ENRs file, line delimited",
     type: "string",
   },
@@ -94,22 +94,24 @@ let server: jayson.Server;
 const foundEnrs: Record<string, ENR> = {};
 
 async function init(
-  peerIdFile: string,
-  enrFile: string,
-  bootstrapEnrsFile: string,
+  peerIdFile: string | undefined,
+  enrFile: string | undefined,
+  bootstrapEnrsFile: string | undefined,
   bindAddressString: string
 ): Promise<void> {
-  const peerId = await readPeerId(peerIdFile);
-  const localEnr = readEnr(enrFile);
-  const bootstrapEnrs = readEnrs(bootstrapEnrsFile);
+  const peerId = peerIdFile ? await readPeerId(peerIdFile) : await createPeerId();
+  const localEnr = peerIdFile && enrFile ? readEnr(enrFile) : createEnr(peerId);
+  const bootstrapEnrs = bootstrapEnrsFile ? readEnrs(bootstrapEnrsFile) : [];
   const bindAddress = getBindAddress(bindAddressString);
-
+  localEnr.setLocationMultiaddr(new Multiaddr(bindAddressString));
   discv5 = Discv5.create({
     enr: localEnr,
     peerId,
     multiaddr: new Multiaddr(bindAddress),
     config: { requestRetries: 3 },
+    transport:"wss"
   });
+  discv5.enr.setLocationMultiaddr(new Multiaddr(bindAddress));
   bootstrapEnrs.forEach((enr) => {
     log(`Adding bootstrap enr: ${enr.encodeTxt()}`);
     discv5.addEnr(enr);
@@ -217,18 +219,6 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
     discv5.sendTalkResp(srcId, msg.id, Buffer.from(response));
   });
   discv5.on("talkRespReceived", (srcId, enr, msg) => log(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
- /* 
-  while (discv5.isStarted()) {
-    const nodeId = toHex(randomBytes(32));
-    log("Find node: %s", nodeId);
-    const nearest = await discv5.findNode(nodeId);
-    if (discv5.isStarted()) {
-      nearest.forEach((enr) => (foundEnrs[enr.nodeId] = enr));
-      log(`${discv5.kadValues().length} total enrs in the table`);
-      log(`${discv5.connectedPeerCount} total connected peers`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }*/
 }
 
 async function save(
@@ -237,8 +227,8 @@ async function save(
   outputFile: string
 ): Promise<void> {
   const peerId = await discv5.peerId();
-  writePeerId(peerIdFile, peerId);
-  writeEnr(enrFile, discv5.enr, peerId);
+  writePeerId(peerIdFile ?? "./peer-id.json", peerId);
+  writeEnr(enrFile ?? "./local-enrs", discv5.enr, peerId);
   writeEnrs(outputFile, Object.values(foundEnrs));
 }
 
@@ -249,6 +239,7 @@ async function stop(
 ): Promise<void> {
   await save(peerIdFile, enrFile, outputFile);
   await discv5.stop();
+  await server.http().removeAllListeners();
   log("Service stopped");
   process.exit(0);
 }
