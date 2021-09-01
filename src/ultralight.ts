@@ -41,7 +41,7 @@ exports.builder = {
   },
   a: {
     alias: "bind-address",
-    default: "/ip4/0.0.0.0/tcp/5500/wss",
+    default: "/ip4/0.0.0.0/udp/5500",
     describe: "Multiaddr of the bind address (Must use UDP or WSS transport)",
     type: "string",
   },
@@ -104,12 +104,13 @@ async function init(
   const bootstrapEnrs = bootstrapEnrsFile ? readEnrs(bootstrapEnrsFile) : [];
   const bindAddress = getBindAddress(bindAddressString);
   localEnr.setLocationMultiaddr(new Multiaddr(bindAddressString));
+  const transport = localEnr.tcp ? "wss" : "udp";
   discv5 = Discv5.create({
     enr: localEnr,
     peerId,
     multiaddr: new Multiaddr(bindAddress),
     config: { requestRetries: 3 },
-    transport:"wss"
+    transport
   });
   discv5.enr.setLocationMultiaddr(new Multiaddr(bindAddress));
   bootstrapEnrs.forEach((enr) => {
