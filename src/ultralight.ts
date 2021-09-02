@@ -236,7 +236,9 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
   discv5udp.on("talkRespReceived", (srcId, enr, msg) => 
     udpLog(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
   discv5wss.on("talkReqReceived", (srcId, enr, msg) => {
-    udpLog(`Received message from ${srcId}`);
+    wssLog(`Received message from ${srcId}`);
+    const response = msg.request.toString("utf-8") + " echo";
+    discv5wss.sendTalkResp(srcId, msg.id, Buffer.from(response));
     discv5udp.broadcastTalkReq(msg.request, "portal");
     discv5wss.broadcastTalkReq(msg.request, "portal");
   });
