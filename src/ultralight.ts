@@ -29,7 +29,7 @@ exports.builder = {
   },
   e: {
     alias: "local-enr-file",
-    demandOption:false,
+    demandOption: false,
     describe: "Local ENR file -- e.g. ./local-enrs",
     type: "string",
   },
@@ -86,8 +86,9 @@ exports.handler = function (argv: IInput): void {
   );
 };
 
-const log = debug("discv5:cli");
-log.enabled = true;
+const udpLog = debug("ultralight:udp");
+const wssLog = debug("ultralight:wss");
+wssLog.enabled = true;
 let discv5wss: Discv5;
 let discv5udp: Discv5;
 let server: jayson.Server;
@@ -115,14 +116,14 @@ async function init(
   discv5wss = Discv5.create({
     enr: localEnr,
     peerId,
-    multiaddr: new Multiaddr(`/ip4/${bindAddress.host}/tcp/${bindAddress.port+1}`),
-    config: { requestRetries: 3},
+    multiaddr: new Multiaddr(`/ip4/${bindAddress.host}/tcp/${bindAddress.port + 1}`),
+    config: { requestRetries: 3 },
     transport: "wss"
   });
   discv5udp.enr.setLocationMultiaddr(new Multiaddr(`/ip4/${bindAddress.host}/udp/${bindAddress.port}`));
-  discv5wss.enr.setLocationMultiaddr(new Multiaddr(`/ip4/${bindAddress.host}/tcp/${bindAddress.port+1}`));
+  discv5wss.enr.setLocationMultiaddr(new Multiaddr(`/ip4/${bindAddress.host}/tcp/${bindAddress.port + 1}`));
   bootstrapEnrs.forEach((enr) => {
-    log(`Adding bootstrap enr: ${enr.encodeTxt()}`);
+    udpLog(`Adding bootstrap enr: ${enr.encodeTxt()}`);
     discv5udp.addEnr(enr);
   });
 }
@@ -143,7 +144,7 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
       try {
         discv5udp.addEnr(args[0]);
       } catch (err) {
-        log(`Error adding ENR: ${err}`);
+        udpLog(`Error adding ENR: ${err}`);
       }
       return null;
     },
@@ -205,34 +206,40 @@ async function start(endpoint: string, rpcport: number): Promise<void> {
     },
   });
   server.on("request", (msg) => {
-    log(`RPC Message Received: Method - ${msg.method} - params: ${msg.params}`);
+    udpLog(`RPC Message Received: Method - ${msg.method} - params: ${msg.params}`);
   });
   await server.http().listen(rpcport, function () {
-    log(`rpc server listening on port ${rpcport}`);
+    udpLog(`rpc server listening on port ${rpcport}`);
   });
   try {
     await discv5udp.start();
     await discv5wss.start();
   } catch (err) {
-    log(`Error starting Discv5: ${err.message}`);
+    udpLog(`Error starting Discv5: ${err.message}`);
   }
 
-  log(
+  udpLog(
     `Service started on ${discv5udp.bindAddress} with local node id: ${discv5udp.enr.nodeId}`
   );
-  log(
+  wssLog(
     `Service started on ${discv5wss.bindAddress} with local node id: ${discv5wss.enr.nodeId}`
   );
-  log(`UDP service ENR is ${discv5udp.enr.encodeTxt(discv5udp.keypair.privateKey)}`);
-  log(`WSS service ENR is ${discv5wss.enr.encodeTxt(discv5wss.keypair.privateKey)}`);
-  discv5udp.on("discovered", (enr) => log(`Discovered node with id: ${enr.id}`));
-  discv5udp.on("enrAdded", (enr) => log(`Added ENR: ${enr.encodeTxt()}`));
+  udpLog(`UDP service ENR is ${discv5udp.enr.encodeTxt(discv5udp.keypair.privateKey)}`);
+  wssLog(`WSS service ENR is ${discv5wss.enr.encodeTxt(discv5wss.keypair.privateKey)}`);
+  discv5udp.on("discovered", (enr) => udpLog(`Discovered node with id: ${enr.id}`));
+  discv5udp.on("enrAdded", (enr) => udpLog(`Added ENR: ${enr.encodeTxt()}`));
   discv5udp.on("talkReqReceived", (srcId, enr, msg) => {
-    log(`Received message from ${srcId}`);
+    udpLog(`Received message from ${srcId}`);
     const response = msg.request.toString("utf-8") + "back at you";
     discv5udp.sendTalkResp(srcId, msg.id, Buffer.from(response));
   });
-  discv5udp.on("talkRespReceived", (srcId, enr, msg) => log(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
+  discv5udp.on("talkRespReceived", (srcId, enr, msg) => 
+    udpLog(`Received ${msg.response.toString("utf-8")} from node ${srcId}`));
+  discv5wss.on("talkReqReceived", (srcId, enr, msg) => {
+    udpLog(`Received message from ${srcId}`);
+    discv5udp.broadcastTalkReq(msg.request, "portal");
+    discv5wss.broadcastTalkReq(msg.request, "portal");
+  });
 }
 
 async function save(
@@ -255,6 +262,7 @@ async function stop(
   await discv5udp.stop();
   await discv5wss.stop();
   await server.http().removeAllListeners();
-  log("Service stopped");
+  udpLog("UDP service stopped");
+  wssLog("WSS service stopped");
   process.exit(0);
 }
